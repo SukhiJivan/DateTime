@@ -1,0 +1,2708 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;">
+    <title id="page-title">TimeHub Pro</title>
+    <meta name="description" content="Professional time management app with clock, alarms, timer, stopwatch, and world time">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle fill='%23ff9500' cx='16' cy='16' r='16'/%3E%3Ctext x='16' y='21' text-anchor='middle' fill='%23000' font-family='monospace' font-size='12' font-weight='bold'%3E12:00%3C/text%3E%3C/svg%3E">
+    <style>
+        /* ======================
+           BASE & RESET
+           ====================== */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        /* ======================
+           CSS VARIABLES (THEMING)
+           ====================== */
+        :root {
+            --bg-primary: #000000;
+            --bg-secondary: #1a1a1a;
+            --text-primary: #ff9500;
+            --text-secondary: #ffffff;
+            --border: #333333;
+            --btn-bg: #2a2a2a;
+            --success: #4caf50;
+            --error: #f44336;
+            --warning: #ff9800;
+            --overlay: rgba(0, 0, 0, 0.85);
+        }
+
+        [data-theme="light"] {
+            --bg-primary: #f5f5f5;
+            --bg-secondary: #ffffff;
+            --text-primary: #333333;
+            --text-secondary: #000000;
+            --border: #dddddd;
+            --btn-bg: #ffffff;
+        }
+
+        /* ======================
+           BASE STYLES
+           ====================== */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Skip to main content link */
+        .skip-link {
+            position: absolute;
+            top: -40px;
+            left: 0;
+            background: var(--text-primary);
+            color: var(--bg-primary);
+            padding: 8px;
+            text-decoration: none;
+            z-index: 100;
+        }
+
+        .skip-link:focus {
+            top: 0;
+        }
+
+        /* ======================
+           NAVIGATION
+           ====================== */
+        .top-nav {
+            background: var(--bg-secondary);
+            background: rgba(26, 26, 26, 0.98);
+            border-bottom: 1px solid var(--border);
+            padding: 12px 20px;
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            z-index: 100;
+            transition: transform 0.3s ease;
+            flex-wrap: wrap;
+            flex-shrink: 0;
+        }
+
+        /* Backdrop filter with fallback */
+        @supports (backdrop-filter: blur(10px)) {
+            .top-nav {
+                backdrop-filter: blur(10px);
+                -webkit-backdrop-filter: blur(10px);
+            }
+        }
+
+        [data-theme="light"] .top-nav {
+            background: rgba(255, 255, 255, 0.98);
+        }
+
+        .top-nav.auto-hidden {
+            transform: translateY(-100%);
+        }
+
+        .nav-btn {
+            padding: 10px 18px;
+            background: var(--btn-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-primary);
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+
+        .nav-btn:hover,
+        .nav-btn:focus {
+            transform: translateY(-2px);
+            outline: 2px solid var(--text-primary);
+            outline-offset: 2px;
+        }
+
+        .nav-btn[aria-pressed="true"] {
+            background: var(--text-primary);
+            color: var(--bg-primary);
+        }
+
+        /* ======================
+           MAIN CONTENT
+           ====================== */
+        .content-wrapper {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+            padding: 20px;
+            overflow-y: auto;
+            padding-top: 40px;
+        }
+
+        /* ======================
+           CLOCK VIEW
+           ====================== */
+        .clock-view {
+            text-align: center;
+            width: 100%;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding-top: 40px;
+        }
+
+        .clock-section {
+            margin-bottom: 60px;
+            display: block;
+            visibility: visible;
+            opacity: 1;
+        }
+
+        .dual-time-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 40px;
+            flex-wrap: wrap;
+        }
+
+        .dual-time-container.single {
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .time-zone-block {
+            text-align: center;
+        }
+
+        .time-zone-label {
+            font-size: 14px;
+            opacity: 0.7;
+            margin-bottom: 8px;
+            color: var(--text-primary);
+        }
+
+        .dual-time-divider {
+            font-size: 60px;
+            opacity: 0.3;
+            color: var(--text-primary);
+        }
+
+        .zoom-controls {
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            z-index: 50;
+            background: var(--bg-secondary);
+            padding: 8px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            transition: transform 0.3s ease;
+        }
+
+        .zoom-controls.auto-hidden {
+            transform: translateX(200%);
+        }
+
+        .zoom-btn {
+            width: 40px;
+            height: 40px;
+            background: var(--btn-bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .zoom-btn:hover {
+            background: var(--text-primary);
+            color: var(--bg-primary);
+        }
+
+        .digital-time {
+            font-size: var(--time-size, clamp(50px, 10vw, 120px));
+            font-weight: 300;
+            color: var(--text-primary);
+            font-family: 'Courier New', monospace;
+            white-space: nowrap;
+            transition: font-size 0.3s ease;
+            line-height: 1.2;
+            display: block;
+            visibility: visible;
+            opacity: 1;
+            min-height: 60px;
+        }
+
+        .digital-date {
+            font-size: clamp(16px, 2.5vw, 28px);
+            color: var(--text-primary);
+            margin-top: 15px;
+            opacity: 0.9;
+        }
+
+        /* Alarm Section in Clock View */
+        .alarm-section {
+            margin-top: 40px;
+            padding: 20px;
+        }
+
+        .alarm-section.hidden {
+            display: none;
+        }
+
+        .toggle-section {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin: 30px 0;
+        }
+
+        .toggle-btn {
+            padding: 12px 28px;
+            background: var(--btn-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .toggle-btn:hover {
+            background: var(--text-primary);
+            color: var(--bg-primary);
+            transform: translateY(-2px);
+        }
+
+        .toggle-btn.active {
+            background: var(--text-primary);
+            color: var(--bg-primary);
+        }
+
+        .alarm-section-title {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .add-alarm-btn {
+            padding: 12px 32px;
+            background: var(--text-primary);
+            color: var(--bg-primary);
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .add-alarm-btn:hover {
+            transform: translateY(-2px);
+            opacity: 0.9;
+        }
+
+        /* World Clocks in Clock View */
+        .world-clocks-section {
+            margin-top: 50px;
+            padding: 20px;
+        }
+
+        .world-clocks-section.hidden {
+            display: none;
+        }
+
+        .world-clocks-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .world-clocks-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .world-clock-card {
+            background: var(--btn-bg);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+            transition: all 0.3s;
+        }
+
+        .world-clock-card:hover {
+            transform: translateY(-2px);
+            border-color: var(--text-primary);
+        }
+
+        .world-clock-card.add-card {
+            cursor: pointer;
+            border: 2px dashed var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100px;
+        }
+
+        .world-clock-city {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: var(--text-primary);
+        }
+
+        .world-clock-time {
+            font-size: 28px;
+            font-weight: 300;
+            font-family: 'Courier New', monospace;
+            margin-bottom: 5px;
+        }
+
+        .world-clock-offset {
+            font-size: 11px;
+            opacity: 0.6;
+        }
+
+        .world-clock-remove {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 14px;
+            line-height: 1;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .world-clock-card {
+            position: relative;
+        }
+
+        .world-clock-card:hover .world-clock-remove {
+            opacity: 1;
+        }
+
+        .world-clock-remove:hover {
+            background: var(--error);
+            color: white;
+            border-color: var(--error);
+        }
+
+        /* ======================
+           PANEL CONTAINERS
+           ====================== */
+        .panel-container {
+            width: 100%;
+            max-width: 900px;
+            padding: 20px;
+            height: 100%;
+            overflow-y: auto;
+        }
+
+        .panel {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 25px;
+            margin-bottom: 15px;
+        }
+
+        .panel-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+
+        /* ======================
+           FORMS
+           ====================== */
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 13px;
+            color: var(--text-primary);
+            margin-bottom: 6px;
+            opacity: 0.8;
+        }
+
+        .form-input,
+        .form-select {
+            width: 100%;
+            padding: 10px 14px;
+            background: var(--btn-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 14px;
+        }
+
+        .form-input:focus,
+        .form-select:focus {
+            outline: 2px solid var(--text-primary);
+            outline-offset: 2px;
+            border-color: var(--text-primary);
+        }
+
+        /* ======================
+           BUTTONS
+           ====================== */
+        .btn {
+            width: 100%;
+            padding: 12px;
+            background: var(--text-primary);
+            border: none;
+            border-radius: 8px;
+            color: var(--bg-primary);
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn:hover,
+        .btn:focus {
+            transform: translateY(-2px);
+            opacity: 0.9;
+            outline: 2px solid var(--text-primary);
+            outline-offset: 2px;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-secondary {
+            background: var(--btn-bg);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+        }
+
+        /* ======================
+           GRID LAYOUTS
+           ====================== */
+        .grid-2 {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+
+        .grid-3 {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+        }
+
+        /* ======================
+           TIMER/STOPWATCH DISPLAY
+           ====================== */
+        .timer-display {
+            font-size: clamp(40px, 10vw, 80px);
+            font-weight: 600;
+            color: var(--text-primary);
+            font-family: 'Courier New', monospace;
+            margin: 25px 0;
+            text-align: center;
+        }
+
+        /* ======================
+           ALARMS
+           ====================== */
+        .alarm-list {
+            display: grid;
+            gap: 12px;
+        }
+
+        .alarm-item {
+            background: var(--btn-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+            display: grid;
+            grid-template-columns: 1fr auto auto;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .alarm-time {
+            font-size: 24px;
+            font-weight: 600;
+            font-family: 'Courier New', monospace;
+        }
+
+        .alarm-label {
+            font-size: 12px;
+            opacity: 0.7;
+            margin-top: 4px;
+        }
+
+        .alarm-toggle {
+            width: 50px;
+            height: 28px;
+            background: var(--border);
+            border: none;
+            border-radius: 14px;
+            position: relative;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .alarm-toggle[aria-checked="true"] {
+            background: var(--text-primary);
+        }
+
+        .alarm-toggle::after {
+            content: '';
+            position: absolute;
+            width: 22px;
+            height: 22px;
+            background: white;
+            border-radius: 50%;
+            top: 3px;
+            left: 3px;
+            transition: all 0.3s;
+        }
+
+        .alarm-toggle[aria-checked="true"]::after {
+            left: 25px;
+        }
+
+        .alarm-delete {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            width: 35px;
+            height: 35px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        .alarm-delete:hover,
+        .alarm-delete:focus {
+            background: var(--error);
+            color: white;
+            border-color: var(--error);
+        }
+
+        /* ======================
+           MODAL
+           ====================== */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: var(--overlay);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .modal[aria-hidden="false"] {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 30px;
+            max-width: 500px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-title {
+            font-size: 22px;
+            font-weight: 600;
+            margin-bottom: 25px;
+        }
+
+        .modal-close {
+            float: right;
+            background: transparent;
+            border: none;
+            color: var(--text-primary);
+            font-size: 28px;
+            cursor: pointer;
+            line-height: 1;
+            padding: 0;
+            width: 32px;
+            height: 32px;
+        }
+
+        .modal-close:hover,
+        .modal-close:focus {
+            opacity: 0.7;
+            outline: 2px solid var(--text-primary);
+            border-radius: 4px;
+        }
+
+        /* ======================
+           TOAST NOTIFICATIONS
+           ====================== */
+        .toast-container {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 2000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .toast {
+            background: var(--text-primary);
+            color: var(--bg-primary);
+            padding: 16px 24px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            animation: slideIn 0.3s ease;
+            min-width: 250px;
+        }
+
+        .toast.success {
+            background: var(--success);
+            color: white;
+        }
+
+        .toast.error {
+            background: var(--error);
+            color: white;
+        }
+
+        .toast.warning {
+            background: var(--warning);
+            color: white;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        /* ======================
+           WORLD TIME GRID
+           ====================== */
+        .world-time-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+            padding: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .world-time-card {
+            background: var(--btn-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 25px;
+            text-align: center;
+            position: relative;
+            transition: all 0.3s;
+            min-height: 140px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .world-time-card:hover {
+            transform: translateY(-4px);
+            border-color: var(--text-primary);
+        }
+
+        .world-time-card.add-card {
+            cursor: pointer;
+            border: 2px dashed var(--border);
+        }
+
+        .world-time-city {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 15px;
+        }
+
+        .world-time-time {
+            font-size: 42px;
+            font-weight: 300;
+            font-family: 'Courier New', monospace;
+            margin-bottom: 8px;
+        }
+
+        .world-time-date {
+            font-size: 13px;
+            opacity: 0.7;
+        }
+
+        .world-time-remove {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 18px;
+            line-height: 1;
+        }
+
+        .world-time-remove:hover,
+        .world-time-remove:focus {
+            background: var(--error);
+            color: white;
+            border-color: var(--error);
+        }
+
+        /* ======================
+           AGE CALCULATOR RESULTS
+           ====================== */
+        .result-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .result-card {
+            background: var(--btn-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .result-value {
+            font-size: 32px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+
+        .result-label {
+            font-size: 13px;
+            opacity: 0.7;
+        }
+
+        /* ======================
+           LOADING STATE
+           ====================== */
+        .loading {
+            opacity: 0.6;
+            pointer-events: none;
+            position: relative;
+        }
+
+        .loading::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 30px;
+            height: 30px;
+            border: 3px solid var(--border);
+            border-top-color: var(--text-primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: translate(-50%, -50%) rotate(360deg); }
+        }
+
+        /* ======================
+           FULLSCREEN MODE
+           ====================== */
+        .fullscreen-mode {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: var(--bg-primary);
+            z-index: 9999;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .fullscreen-mode[aria-hidden="false"] {
+            display: flex;
+        }
+
+        .fullscreen-time {
+            font-size: clamp(80px, 15vw, 200px);
+            font-weight: 300;
+            font-family: 'Courier New', monospace;
+        }
+
+        .fullscreen-date {
+            font-size: clamp(24px, 4vw, 48px);
+            margin-top: 20px;
+            opacity: 0.8;
+        }
+
+        .fullscreen-exit {
+            position: absolute;
+            top: 30px;
+            right: 30px;
+            background: var(--text-primary);
+            color: var(--bg-primary);
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .fullscreen-mode:hover .fullscreen-exit {
+            opacity: 1;
+        }
+
+        /* ======================
+           UTILITY CLASSES
+           ====================== */
+        .hidden {
+            display: none !important;
+        }
+
+        .visually-hidden {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+
+        /* ======================
+           SCROLLBAR
+           ====================== */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-secondary);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-primary);
+        }
+
+        /* ======================
+           RESPONSIVE
+           ====================== */
+        @media (max-width: 768px) {
+            .grid-2,
+            .grid-3,
+            .result-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .world-time-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* ======================
+           PRINT STYLES
+           ====================== */
+        @media print {
+            .top-nav,
+            .set-alarm-btn,
+            .btn,
+            .modal {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body data-theme="dark">
+    <!-- Skip to main content -->
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+
+    <!-- Top Navigation -->
+    <nav class="top-nav" id="topNav" role="navigation" aria-label="Main navigation">
+        <button class="nav-btn" 
+                data-view="clock" 
+                aria-pressed="true" 
+                aria-label="Switch to clock view">
+            Clock
+        </button>
+        <button class="nav-btn" 
+                data-view="timer" 
+                aria-pressed="false" 
+                aria-label="Switch to timer view">
+            Timer
+        </button>
+        <button class="nav-btn" 
+                data-view="stopwatch" 
+                aria-pressed="false" 
+                aria-label="Switch to stopwatch view">
+            Stopwatch
+        </button>
+        <button class="nav-btn" 
+                data-view="settings" 
+                aria-pressed="false" 
+                aria-label="Switch to settings view">
+            Settings
+        </button>
+        <button class="nav-btn" 
+                id="fullscreenBtn" 
+                aria-label="Enter fullscreen mode">
+            Fullscreen
+        </button>
+        <button class="nav-btn" 
+                id="themeBtn" 
+                aria-label="Toggle theme">
+            🌓
+        </button>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="content-wrapper">
+        <main class="main-content" id="main-content" role="main">
+            <!-- Clock View -->
+            <div id="clockView" class="clock-view" role="region" aria-label="Clock display">
+                <!-- Zoom Controls -->
+                <div class="zoom-controls" id="zoomControls">
+                    <button class="zoom-btn" onclick="zoomIn()" aria-label="Zoom in" title="Zoom In">+</button>
+                    <button class="zoom-btn" onclick="resetZoom()" aria-label="Reset zoom" title="Reset">⊙</button>
+                    <button class="zoom-btn" onclick="zoomOut()" aria-label="Zoom out" title="Zoom Out">−</button>
+                </div>
+
+                <!-- Main Clock -->
+                <div class="clock-section">
+                    <div class="dual-time-container" id="dualTimeContainer">
+                        <div class="time-zone-block" id="localTimeBlock">
+                            <div class="time-zone-label" id="localTimeLabel">Detecting location...</div>
+                            <div class="digital-time" id="digitalTime" aria-live="polite">00:00:00</div>
+                            <div class="digital-date" id="digitalDate">Loading...</div>
+                        </div>
+                        <div class="dual-time-divider" id="timeDivider" style="display: none;">|</div>
+                        <div class="time-zone-block" id="dualTimeBlock" style="display: none;">
+                            <div class="time-zone-label" id="dualTimeLabel">New York</div>
+                            <div class="digital-time" id="dualTime" aria-live="polite">00:00:00</div>
+                            <div class="digital-date" id="dualDate">Loading...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Toggle Buttons Section -->
+                <div class="toggle-section">
+                    <button class="toggle-btn" id="toggleAlarmBtn" onclick="toggleSection('alarm')" aria-label="Show alarms">
+                        ⏰ Alarms
+                    </button>
+                    <button class="toggle-btn" id="toggleWorldBtn" onclick="toggleSection('world')" aria-label="Show world clocks">
+                        🌍 World Clocks
+                    </button>
+                </div>
+
+                <!-- Alarms Section (Hidden by default) -->
+                <div class="alarm-section hidden" id="alarmSection">
+                    <div class="alarm-section-title">
+                        <span></span>
+                        <button class="add-alarm-btn" id="openAlarmBtn" aria-label="Set alarm">
+                            Set Alarm
+                        </button>
+                    </div>
+                    <div class="alarm-list" id="alarmList" role="list" aria-live="polite">
+                        <div style="text-align: center; padding: 20px; opacity: 0.5;">No alarms set</div>
+                    </div>
+                </div>
+
+                <!-- World Clocks Section (Hidden by default) -->
+                <div class="world-clocks-section hidden" id="worldClocksSection">
+                    <div class="world-clocks-grid" id="worldClocksGrid" role="list">
+                        <!-- World clocks rendered here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Timer View -->
+            <div id="timerView" class="panel-container hidden" role="region" aria-label="Timer">
+                <div class="panel">
+                    <h2 class="panel-title">⏱️ Timer</h2>
+                    <div class="timer-display" id="timerDisplay" aria-live="polite">00:00:00</div>
+                    
+                    <div class="grid-3" style="margin-bottom: 15px;">
+                        <div>
+                            <label class="form-label" for="timerHours">Hours</label>
+                            <input type="number" 
+                                   class="form-input" 
+                                   id="timerHours" 
+                                   min="0" 
+                                   max="23" 
+                                   value="0"
+                                   aria-label="Timer hours">
+                        </div>
+                        <div>
+                            <label class="form-label" for="timerMinutes">Minutes</label>
+                            <input type="number" 
+                                   class="form-input" 
+                                   id="timerMinutes" 
+                                   min="0" 
+                                   max="59" 
+                                   value="0"
+                                   aria-label="Timer minutes">
+                        </div>
+                        <div>
+                            <label class="form-label" for="timerSeconds">Seconds</label>
+                            <input type="number" 
+                                   class="form-input" 
+                                   id="timerSeconds" 
+                                   min="0" 
+                                   max="59" 
+                                   value="0"
+                                   aria-label="Timer seconds">
+                        </div>
+                    </div>
+
+                    <div class="grid-2">
+                        <button class="btn" id="timerStartBtn">Start</button>
+                        <button class="btn btn-secondary" id="timerResetBtn">Reset</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stopwatch View -->
+            <div id="stopwatchView" class="panel-container hidden" role="region" aria-label="Stopwatch">
+                <div class="panel">
+                    <h2 class="panel-title">⏱️ Stopwatch</h2>
+                    <div class="timer-display" id="stopwatchDisplay" aria-live="polite">00:00:00</div>
+                    
+                    <div class="grid-2" style="margin-bottom: 15px;">
+                        <button class="btn" id="stopwatchStartBtn">Start</button>
+                        <button class="btn btn-secondary" id="stopwatchResetBtn">Reset</button>
+                    </div>
+                    
+                    <button class="btn btn-secondary hidden" id="stopwatchLapBtn">Record Lap</button>
+                    
+                    <div id="stopwatchLaps" role="list" aria-label="Lap times"></div>
+                </div>
+            </div>
+
+            <!-- Settings View -->
+            <div id="settingsView" class="panel-container hidden" role="region" aria-label="Settings">
+                <div class="panel">
+                    <h2 class="panel-title">⚙️ Settings</h2>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="timeFormatSelect">Time Format</label>
+                        <select class="form-select" id="timeFormatSelect" aria-label="Select time format">
+                            <option value="12">12-hour</option>
+                            <option value="24">24-hour</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="dateFormatSelect">Date Format</label>
+                        <select class="form-select" id="dateFormatSelect" aria-label="Select date format">
+                            <option value="full">Full (Monday, January 1, 2024)</option>
+                            <option value="short">Short (Mon, Jan 1, 2024)</option>
+                            <option value="numeric">Numeric (01/01/2024)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">
+                            <input type="checkbox" id="dualTimeToggle" style="margin-right: 8px;">
+                            Enable Dual Time Display
+                        </label>
+                    </div>
+
+                    <div class="form-group" id="dualTimeSettings" style="display: none;">
+                        <label class="form-label" for="dualTimeZoneSelect">Secondary Time Zone</label>
+                        <select class="form-select" id="dualTimeZoneSelect" aria-label="Select secondary timezone">
+                            <option value="America/New_York">New York</option>
+                            <option value="America/Chicago">Chicago, Illinois</option>
+                            <option value="America/Denver">Denver, Colorado</option>
+                            <option value="America/Los_Angeles">Los Angeles, California</option>
+                            <option value="America/Phoenix">Phoenix, Arizona</option>
+                            <option value="America/Anchorage">Anchorage, Alaska</option>
+                            <option value="Pacific/Honolulu">Honolulu, Hawaii</option>
+                            <option value="America/Toronto">Toronto, Canada</option>
+                            <option value="Europe/London">London, United Kingdom</option>
+                            <option value="Europe/Paris">Paris, France</option>
+                            <option value="Europe/Berlin">Berlin, Germany</option>
+                            <option value="Europe/Rome">Rome, Italy</option>
+                            <option value="Europe/Madrid">Madrid, Spain</option>
+                            <option value="Europe/Moscow">Moscow, Russia</option>
+                            <option value="Asia/Dubai">Dubai, United Arab Emirates</option>
+                            <option value="Asia/Kolkata">Mumbai, India</option>
+                            <option value="Asia/Singapore">Singapore, Singapore</option>
+                            <option value="Asia/Hong_Kong">Hong Kong, China</option>
+                            <option value="Asia/Tokyo">Tokyo, Japan</option>
+                            <option value="Asia/Shanghai">Beijing, China</option>
+                            <option value="Asia/Seoul">Seoul, South Korea</option>
+                            <option value="Asia/Bangkok">Bangkok, Thailand</option>
+                            <option value="Asia/Manila">Manila, Philippines</option>
+                            <option value="Australia/Sydney">Sydney, Australia</option>
+                            <option value="Pacific/Auckland">Auckland, New Zealand</option>
+                            <option value="America/Mexico_City">Mexico City, Mexico</option>
+                            <option value="America/Sao_Paulo">São Paulo, Brazil</option>
+                            <option value="America/Argentina/Buenos_Aires">Buenos Aires, Argentina</option>
+                            <option value="Africa/Cairo">Cairo, Egypt</option>
+                            <option value="Africa/Johannesburg">Johannesburg, South Africa</option>
+                        </select>
+                    </div>
+
+                    <button class="btn btn-secondary" id="exportDataBtn" style="margin-top: 10px;">
+                        Export Data
+                    </button>
+                    <button class="btn btn-secondary" id="importDataBtn" style="margin-top: 10px;">
+                        Import Data
+                    </button>
+                    <input type="file" id="importFileInput" accept=".json" class="hidden">
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Alarm Modal -->
+    <div class="modal" id="alarmModal" role="dialog" aria-labelledby="alarmModalTitle" aria-hidden="true">
+        <div class="modal-content">
+            <button class="modal-close" 
+                    id="closeAlarmModal" 
+                    aria-label="Close alarm dialog">×</button>
+            <h2 class="modal-title" id="alarmModalTitle">Set Alarm</h2>
+            
+            <div class="form-group">
+                <label class="form-label">Alarm Time</label>
+                <div class="grid-3">
+                    <div>
+                        <label class="form-label" for="alarmHour">Hour</label>
+                        <select class="form-select" id="alarmHour" aria-required="true">
+                            <!-- Options generated by JS -->
+                        </select>
+                    </div>
+                    <div>
+                        <label class="form-label" for="alarmMinute">Minute</label>
+                        <select class="form-select" id="alarmMinute" aria-required="true">
+                            <!-- Options generated by JS -->
+                        </select>
+                    </div>
+                    <div>
+                        <label class="form-label" for="alarmPeriod">Period</label>
+                        <select class="form-select" id="alarmPeriod" aria-required="true">
+                            <option value="AM">AM</option>
+                            <option value="PM">PM</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label" for="alarmLabel">Label (Optional)</label>
+                <input type="text" 
+                       class="form-input" 
+                       id="alarmLabel" 
+                       placeholder="Wake up"
+                       maxlength="100"
+                       aria-label="Alarm label">
+            </div>
+            
+            <button class="btn btn-secondary" id="testSoundBtn" style="margin-bottom: 10px;">
+                Test Alarm Sound
+            </button>
+            <button class="btn" id="saveAlarmBtn">Save Alarm</button>
+        </div>
+    </div>
+
+    <!-- Fullscreen Mode -->
+    <div class="fullscreen-mode" id="fullscreenMode" aria-hidden="true">
+        <button class="fullscreen-exit" id="exitFullscreenBtn" aria-label="Exit fullscreen mode">
+            Exit
+        </button>
+        <div style="text-align: center;">
+            <div class="dual-time-container" id="fullscreenDualContainer">
+                <div class="time-zone-block">
+                    <div class="time-zone-label" id="fullscreenLocalLabel" style="font-size: 24px; margin-bottom: 15px;">Detecting location...</div>
+                    <div class="fullscreen-time" id="fullscreenTime" aria-live="polite">00:00:00</div>
+                    <div class="fullscreen-date" id="fullscreenDate">Loading...</div>
+                </div>
+                <div class="dual-time-divider" id="fullscreenDivider" style="display: none; font-size: 100px;">|</div>
+                <div class="time-zone-block" id="fullscreenDualBlock" style="display: none;">
+                    <div class="time-zone-label" id="fullscreenDualLabel" style="font-size: 24px; margin-bottom: 15px;">New York</div>
+                    <div class="fullscreen-time" id="fullscreenDualTime" aria-live="polite">00:00:00</div>
+                    <div class="fullscreen-date" id="fullscreenDualDate">Loading...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer" role="status" aria-live="polite" aria-atomic="true"></div>
+
+    <script>
+        'use strict';
+
+        /**
+         * ======================
+         * CONFIGURATION & CONSTANTS
+         * ======================
+         */
+        var CONFIG = {
+            AUTO_HIDE_DELAY: 3000,
+            CLOCK_UPDATE_INTERVAL: 1000,
+            STOPWATCH_UPDATE_INTERVAL: 10,
+            TOAST_DURATION: 3000,
+            MAX_ALARM_LABEL_LENGTH: 100,
+            MAX_ALARMS: 50,
+            STORAGE_KEYS: {
+                ALARMS: 'timehub_alarms',
+                WORLD_CLOCKS: 'timehub_world_clocks',
+                SETTINGS: 'timehub_settings'
+            }
+        };
+
+        /**
+         * ======================
+         * STATE MANAGEMENT
+         * ======================
+         */
+        var AppState = {
+            currentView: 'clock',
+            alarms: [],
+            worldClocks: [],
+            settings: {
+                timeFormat: '12',
+                dateFormat: 'full',
+                theme: 'dark',
+                dualTimeEnabled: false,
+                dualTimeZone: 'America/New_York',
+                dualTimeName: 'New York'
+            },
+            timers: {
+                clock: null,
+                alarm: null,
+                timer: null,
+                stopwatch: null,
+                autoHide: null
+            },
+            stopwatch: {
+                running: false,
+                time: 0,
+                laps: []
+            },
+            timer: {
+                running: false,
+                seconds: 0
+            },
+            zoom: {
+                level: 1,
+                min: 0.5,
+                max: 2.0,
+                step: 0.1
+            }
+        };
+
+        /**
+         * ======================
+         * UTILITY FUNCTIONS
+         * ======================
+         */
+
+        /**
+         * Safely escapes HTML to prevent XSS attacks
+         * @param {string} text - Text to escape
+         * @returns {string} Escaped HTML
+         */
+        function escapeHtml(text) {
+            var div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        /**
+         * Pads number with leading zero
+         * @param {number} num - Number to pad
+         * @returns {string} Padded number
+         */
+        function pad(num) {
+            return String(num).padStart(2, '0');
+        }
+
+        /**
+         * Shows toast notification
+         * @param {string} message - Message to display
+         * @param {string} type - Toast type (success, error, warning)
+         */
+        function showToast(message, type) {
+            type = type || 'success';
+            var container = document.getElementById('toastContainer');
+            var toast = document.createElement('div');
+            toast.className = 'toast ' + type;
+            toast.textContent = message;
+            toast.setAttribute('role', 'alert');
+            
+            container.appendChild(toast);
+            
+            setTimeout(function() {
+                toast.style.animation = 'slideIn 0.3s ease reverse';
+                setTimeout(function() {
+                    container.removeChild(toast);
+                }, 300);
+            }, CONFIG.TOAST_DURATION);
+        }
+
+        /**
+         * Safe localStorage operations
+         */
+        var Storage = {
+            /**
+             * Get item from localStorage
+             * @param {string} key - Storage key
+             * @param {*} defaultValue - Default value if key doesn't exist
+             * @returns {*} Stored value or default
+             */
+            get: function(key, defaultValue) {
+                try {
+                    var item = localStorage.getItem(key);
+                    return item ? JSON.parse(item) : defaultValue;
+                } catch (e) {
+                    console.error('Storage get error:', e);
+                    showToast('Failed to load data', 'error');
+                    return defaultValue;
+                }
+            },
+
+            /**
+             * Set item in localStorage
+             * @param {string} key - Storage key
+             * @param {*} value - Value to store
+             * @returns {boolean} Success status
+             */
+            set: function(key, value) {
+                try {
+                    localStorage.setItem(key, JSON.stringify(value));
+                    return true;
+                } catch (e) {
+                    console.error('Storage set error:', e);
+                    if (e.name === 'QuotaExceededError') {
+                        showToast('Storage quota exceeded. Please clear some data.', 'error');
+                    } else {
+                        showToast('Failed to save data', 'error');
+                    }
+                    return false;
+                }
+            },
+
+            /**
+             * Remove item from localStorage
+             * @param {string} key - Storage key
+             */
+            remove: function(key) {
+                try {
+                    localStorage.removeItem(key);
+                } catch (e) {
+                    console.error('Storage remove error:', e);
+                }
+            }
+        };
+
+        /**
+         * ======================
+         * INITIALIZATION
+         * ======================
+         */
+        function init() {
+            loadSettings();
+            loadAlarms();
+            loadWorldClocks();
+            setupEventListeners();
+            populateAlarmSelects();
+            detectUserLocation(); // Detect actual location
+            
+            // Update clock immediately (before starting interval)
+            updateClock();
+            updateClock(); // Call twice to ensure it renders
+            updateDualTimeDisplay(); // Initialize dual time display
+            
+            startClock();
+            startAlarmChecker();
+            renderWorldClocks();
+            renderAlarms();
+            applyTheme();
+            setupAutoHide();
+            
+            // Update again after short delay to ensure rendering
+            setTimeout(updateClock, 100);
+            setTimeout(updateDualTimeDisplay, 100);
+            
+            // Request notification permission
+            if ('Notification' in window && Notification.permission === 'default') {
+                Notification.requestPermission();
+            }
+        }
+
+        /**
+         * Detect user's actual location and display it
+         */
+        function detectUserLocation() {
+            try {
+                var timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                var locationName = getLocationNameFromTimezone(timezone);
+                
+                // Update home screen
+                document.getElementById('localTimeLabel').textContent = locationName;
+                
+                // Update fullscreen
+                document.getElementById('fullscreenLocalLabel').textContent = locationName;
+                
+                // Store for later use
+                AppState.userLocation = locationName;
+                AppState.userTimezone = timezone;
+            } catch (e) {
+                console.error('Could not detect location:', e);
+                document.getElementById('localTimeLabel').textContent = 'Local Time';
+                document.getElementById('fullscreenLocalLabel').textContent = 'Local Time';
+            }
+        }
+
+        /**
+         * Convert timezone string to readable location name
+         * @param {string} timezone - IANA timezone string
+         * @returns {string} Readable location name
+         */
+        function getLocationNameFromTimezone(timezone) {
+            // Map of timezones to full location names
+            var timezoneMap = {
+                'America/New_York': 'New York',
+                'America/Chicago': 'Chicago, Illinois',
+                'America/Denver': 'Denver, Colorado',
+                'America/Los_Angeles': 'Los Angeles, California',
+                'America/Phoenix': 'Phoenix, Arizona',
+                'America/Anchorage': 'Anchorage, Alaska',
+                'Pacific/Honolulu': 'Honolulu, Hawaii',
+                'America/Toronto': 'Toronto, Canada',
+                'America/Vancouver': 'Vancouver, Canada',
+                'America/Mexico_City': 'Mexico City, Mexico',
+                'America/Sao_Paulo': 'São Paulo, Brazil',
+                'America/Argentina/Buenos_Aires': 'Buenos Aires, Argentina',
+                'Europe/London': 'London, United Kingdom',
+                'Europe/Paris': 'Paris, France',
+                'Europe/Berlin': 'Berlin, Germany',
+                'Europe/Rome': 'Rome, Italy',
+                'Europe/Madrid': 'Madrid, Spain',
+                'Europe/Moscow': 'Moscow, Russia',
+                'Asia/Dubai': 'Dubai, United Arab Emirates',
+                'Asia/Kolkata': 'Mumbai, India',
+                'Asia/Singapore': 'Singapore',
+                'Asia/Hong_Kong': 'Hong Kong',
+                'Asia/Tokyo': 'Tokyo, Japan',
+                'Asia/Shanghai': 'Beijing, China',
+                'Asia/Seoul': 'Seoul, South Korea',
+                'Asia/Bangkok': 'Bangkok, Thailand',
+                'Asia/Manila': 'Manila, Philippines',
+                'Australia/Sydney': 'Sydney, Australia',
+                'Pacific/Auckland': 'Auckland, New Zealand',
+                'Africa/Cairo': 'Cairo, Egypt',
+                'Africa/Johannesburg': 'Johannesburg, South Africa'
+            };
+
+            // Try direct match first
+            if (timezoneMap[timezone]) {
+                return timezoneMap[timezone];
+            }
+
+            // Parse timezone string (e.g., "America/New_York" -> "New York")
+            var parts = timezone.split('/');
+            if (parts.length > 1) {
+                var city = parts[parts.length - 1];
+                // Replace underscores with spaces
+                city = city.replace(/_/g, ' ');
+                // Add continent/region for context
+                var region = parts[0];
+                return city + ', ' + region;
+            }
+
+            // Fallback
+            return timezone.replace(/_/g, ' ');
+        }
+
+        /**
+         * Load settings from storage
+         */
+        function loadSettings() {
+            AppState.settings = Storage.get(CONFIG.STORAGE_KEYS.SETTINGS, AppState.settings);
+            
+            document.getElementById('timeFormatSelect').value = AppState.settings.timeFormat;
+            document.getElementById('dateFormatSelect').value = AppState.settings.dateFormat;
+            
+            // Dual time settings
+            document.getElementById('dualTimeToggle').checked = AppState.settings.dualTimeEnabled || false;
+            document.getElementById('dualTimeSettings').style.display = 
+                AppState.settings.dualTimeEnabled ? 'block' : 'none';
+            
+            if (AppState.settings.dualTimeZone) {
+                document.getElementById('dualTimeZoneSelect').value = AppState.settings.dualTimeZone;
+            }
+        }
+
+        /**
+         * Save settings to storage
+         */
+        function saveSettings() {
+            Storage.set(CONFIG.STORAGE_KEYS.SETTINGS, AppState.settings);
+        }
+
+        /**
+         * Load alarms from storage
+         */
+        function loadAlarms() {
+            AppState.alarms = Storage.get(CONFIG.STORAGE_KEYS.ALARMS, []);
+            renderAlarms();
+        }
+
+        /**
+         * Save alarms to storage
+         */
+        function saveAlarms() {
+            Storage.set(CONFIG.STORAGE_KEYS.ALARMS, AppState.alarms);
+        }
+
+        /**
+         * Load world clocks from storage
+         */
+        function loadWorldClocks() {
+            var defaultClocks = [
+                { tz: 'America/New_York', name: 'New York' },
+                { tz: 'America/Chicago', name: 'Chicago, Illinois' },
+                { tz: 'America/Denver', name: 'Denver, Colorado' },
+                { tz: 'America/Los_Angeles', name: 'Los Angeles, California' },
+                { tz: 'America/Phoenix', name: 'Phoenix, Arizona' },
+                { tz: 'America/Anchorage', name: 'Anchorage, Alaska' },
+                { tz: 'Pacific/Honolulu', name: 'Honolulu, Hawaii' },
+                { tz: 'America/Toronto', name: 'Toronto, Canada' },
+                { tz: 'Europe/London', name: 'London, United Kingdom' },
+                { tz: 'Australia/Sydney', name: 'Sydney, Australia' },
+                { tz: 'Asia/Manila', name: 'Manila, Philippines' },
+                { tz: 'Asia/Singapore', name: 'Singapore, Singapore' },
+                { tz: 'Asia/Tokyo', name: 'Tokyo, Japan' },
+                { tz: 'Asia/Shanghai', name: 'Beijing, China' },
+                { tz: 'Europe/Berlin', name: 'Berlin, Germany' },
+                { tz: 'America/Mexico_City', name: 'Mexico City, Mexico' },
+                { tz: 'America/Argentina/Buenos_Aires', name: 'Buenos Aires, Argentina' },
+                { tz: 'Asia/Dubai', name: 'Dubai, United Arab Emirates' }
+            ];
+            
+            AppState.worldClocks = Storage.get(CONFIG.STORAGE_KEYS.WORLD_CLOCKS, defaultClocks);
+        }
+
+        /**
+         * Save world clocks to storage
+         */
+        function saveWorldClocks() {
+            Storage.set(CONFIG.STORAGE_KEYS.WORLD_CLOCKS, AppState.worldClocks);
+        }
+
+        /**
+         * ======================
+         * EVENT LISTENERS
+         * ======================
+         */
+        function setupEventListeners() {
+            // Navigation
+            var navBtns = document.querySelectorAll('.nav-btn[data-view]');
+            navBtns.forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    switchView(this.getAttribute('data-view'));
+                });
+            });
+
+            // Theme toggle
+            document.getElementById('themeBtn').addEventListener('click', toggleTheme);
+
+            // Fullscreen
+            document.getElementById('fullscreenBtn').addEventListener('click', enterFullscreen);
+            document.getElementById('exitFullscreenBtn').addEventListener('click', exitFullscreen);
+
+            // Alarm
+            document.getElementById('openAlarmBtn').addEventListener('click', openAlarmModal);
+            document.getElementById('closeAlarmModal').addEventListener('click', closeAlarmModal);
+            document.getElementById('saveAlarmBtn').addEventListener('click', saveAlarm);
+            document.getElementById('testSoundBtn').addEventListener('click', testAlarmSound);
+
+            // Timer
+            document.getElementById('timerStartBtn').addEventListener('click', toggleTimer);
+            document.getElementById('timerResetBtn').addEventListener('click', resetTimer);
+
+            // Stopwatch
+            document.getElementById('stopwatchStartBtn').addEventListener('click', toggleStopwatch);
+            document.getElementById('stopwatchResetBtn').addEventListener('click', resetStopwatch);
+            document.getElementById('stopwatchLapBtn').addEventListener('click', recordLap);
+
+            // Settings
+            document.getElementById('timeFormatSelect').addEventListener('change', function() {
+                AppState.settings.timeFormat = this.value;
+                saveSettings();
+                updateClock();
+            });
+
+            document.getElementById('dateFormatSelect').addEventListener('change', function() {
+                AppState.settings.dateFormat = this.value;
+                saveSettings();
+                updateClock();
+            });
+
+            document.getElementById('dualTimeToggle').addEventListener('change', function() {
+                AppState.settings.dualTimeEnabled = this.checked;
+                document.getElementById('dualTimeSettings').style.display = this.checked ? 'block' : 'none';
+                saveSettings();
+                updateDualTimeDisplay();
+            });
+
+            document.getElementById('dualTimeZoneSelect').addEventListener('change', function() {
+                var selectedOption = this.options[this.selectedIndex];
+                AppState.settings.dualTimeZone = this.value;
+                AppState.settings.dualTimeName = selectedOption.textContent;
+                saveSettings();
+                updateClock();
+            });
+
+            // Export/Import
+            document.getElementById('exportDataBtn').addEventListener('click', exportData);
+            document.getElementById('importDataBtn').addEventListener('click', function() {
+                document.getElementById('importFileInput').click();
+            });
+            document.getElementById('importFileInput').addEventListener('change', importData);
+
+            // Auto-hide on mouse move
+            document.addEventListener('mousemove', resetAutoHide);
+
+            // Keyboard navigation
+            document.addEventListener('keydown', handleKeyboard);
+
+            // Modal keyboard trap
+            document.getElementById('alarmModal').addEventListener('keydown', trapModalFocus);
+        }
+
+        /**
+         * Handle keyboard shortcuts
+         * @param {KeyboardEvent} e - Keyboard event
+         */
+        function handleKeyboard(e) {
+            // ESC to close modal
+            if (e.key === 'Escape') {
+                var modal = document.getElementById('alarmModal');
+                if (modal.getAttribute('aria-hidden') === 'false') {
+                    closeAlarmModal();
+                }
+                
+                var fullscreen = document.getElementById('fullscreenMode');
+                if (fullscreen.getAttribute('aria-hidden') === 'false') {
+                    exitFullscreen();
+                }
+            }
+        }
+
+        /**
+         * Trap focus within modal
+         * @param {KeyboardEvent} e - Keyboard event
+         */
+        function trapModalFocus(e) {
+            if (e.key !== 'Tab') return;
+
+            var modal = document.getElementById('alarmModal');
+            var focusable = modal.querySelectorAll('button, input, select, [tabindex]:not([tabindex="-1"])');
+            var first = focusable[0];
+            var last = focusable[focusable.length - 1];
+
+            if (e.shiftKey && document.activeElement === first) {
+                last.focus();
+                e.preventDefault();
+            } else if (!e.shiftKey && document.activeElement === last) {
+                first.focus();
+                e.preventDefault();
+            }
+        }
+
+        /**
+         * ======================
+         * VIEW MANAGEMENT
+         * ======================
+         */
+        function switchView(view) {
+            AppState.currentView = view;
+
+            // Hide all views
+            var views = ['clock', 'timer', 'stopwatch', 'settings'];
+            views.forEach(function(v) {
+                var el = document.getElementById(v + 'View');
+                if (el) {
+                    el.classList.add('hidden');
+                }
+            });
+
+            // Show selected view
+            var selectedView = document.getElementById(view + 'View');
+            if (selectedView) {
+                selectedView.classList.remove('hidden');
+            }
+
+            // Update nav buttons
+            var navBtns = document.querySelectorAll('.nav-btn[data-view]');
+            navBtns.forEach(function(btn) {
+                var pressed = btn.getAttribute('data-view') === view;
+                btn.setAttribute('aria-pressed', pressed);
+            });
+
+            // Reset auto-hide
+            resetAutoHide();
+
+            // Start auto-hide for clock view
+            if (view === 'clock') {
+                startAutoHideTimer();
+            }
+        }
+
+        /**
+         * ======================
+         * THEME MANAGEMENT
+         * ======================
+         */
+        function toggleTheme() {
+            AppState.settings.theme = AppState.settings.theme === 'dark' ? 'light' : 'dark';
+            applyTheme();
+            saveSettings();
+        }
+
+        function applyTheme() {
+            document.body.setAttribute('data-theme', AppState.settings.theme);
+        }
+
+        /**
+         * ======================
+         * AUTO-HIDE FUNCTIONALITY
+         * ======================
+         */
+        function setupAutoHide() {
+            resetAutoHide();
+        }
+
+        function resetAutoHide() {
+            clearTimeout(AppState.timers.autoHide);
+            
+            var nav = document.getElementById('topNav');
+            nav.classList.remove('auto-hidden');
+            
+            var zoom = document.getElementById('zoomControls');
+            if (zoom) {
+                zoom.classList.remove('auto-hidden');
+            }
+            
+            if (AppState.currentView === 'clock') {
+                startAutoHideTimer();
+            }
+        }
+
+        function startAutoHideTimer() {
+            AppState.timers.autoHide = setTimeout(function() {
+                if (AppState.currentView === 'clock') {
+                    document.getElementById('topNav').classList.add('auto-hidden');
+                    document.getElementById('zoomControls').classList.add('auto-hidden');
+                }
+            }, CONFIG.AUTO_HIDE_DELAY);
+        }
+
+        /**
+         * ======================
+         * CLOCK FUNCTIONALITY
+         * ======================
+         */
+        function startClock() {
+            updateClock();
+            AppState.timers.clock = setInterval(updateClock, CONFIG.CLOCK_UPDATE_INTERVAL);
+        }
+
+        function updateClock() {
+            var now = new Date();
+            var timeStr = formatTime(now);
+            var dateStr = formatDate(now);
+
+            // Update main clock
+            document.getElementById('digitalTime').textContent = timeStr;
+            document.getElementById('digitalDate').textContent = dateStr;
+            
+            // Update fullscreen local time
+            document.getElementById('fullscreenTime').textContent = timeStr;
+            document.getElementById('fullscreenDate').textContent = dateStr;
+
+            // Update dual time if enabled
+            if (AppState.settings.dualTimeEnabled && AppState.settings.dualTimeZone) {
+                var dualTimeData = getWorldTime(AppState.settings.dualTimeZone);
+                
+                // Home screen dual time
+                document.getElementById('dualTime').textContent = dualTimeData.time;
+                document.getElementById('dualDate').textContent = dualTimeData.date;
+                document.getElementById('dualTimeLabel').textContent = AppState.settings.dualTimeName || 'Secondary';
+                
+                // Fullscreen dual time
+                document.getElementById('fullscreenDualTime').textContent = dualTimeData.time;
+                document.getElementById('fullscreenDualDate').textContent = dualTimeData.date;
+                document.getElementById('fullscreenDualLabel').textContent = AppState.settings.dualTimeName || 'Secondary';
+            }
+
+            // Update page title
+            var titleTime = formatTime(now, true);
+            document.getElementById('page-title').textContent = titleTime + ' - TimeHub';
+
+            // Update world clocks
+            updateWorldClocks();
+        }
+
+        function updateDualTimeDisplay() {
+            var dualEnabled = AppState.settings.dualTimeEnabled;
+            
+            // Home screen
+            document.getElementById('dualTimeBlock').style.display = dualEnabled ? 'block' : 'none';
+            document.getElementById('timeDivider').style.display = dualEnabled ? 'block' : 'none';
+            
+            var container = document.getElementById('dualTimeContainer');
+            if (dualEnabled) {
+                container.classList.remove('single');
+            } else {
+                container.classList.add('single');
+            }
+            
+            // Fullscreen
+            document.getElementById('fullscreenDualBlock').style.display = dualEnabled ? 'block' : 'none';
+            document.getElementById('fullscreenDivider').style.display = dualEnabled ? 'block' : 'none';
+            
+            var fsContainer = document.getElementById('fullscreenDualContainer');
+            if (dualEnabled) {
+                fsContainer.classList.remove('single');
+            } else {
+                fsContainer.classList.add('single');
+            }
+            
+            updateClock();
+        }
+
+        /**
+         * Format time based on settings
+         * @param {Date} date - Date object
+         * @param {boolean} noSeconds - Hide seconds
+         * @returns {string} Formatted time
+         */
+        function formatTime(date, noSeconds) {
+            if (AppState.settings.timeFormat === '12') {
+                return date.toLocaleTimeString('en-US', {
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    second: noSeconds ? undefined : '2-digit',
+                    hour12: true
+                });
+            } else {
+                var h = pad(date.getHours());
+                var m = pad(date.getMinutes());
+                var s = noSeconds ? '' : ':' + pad(date.getSeconds());
+                return h + ':' + m + s;
+            }
+        }
+
+        /**
+         * Format date based on settings
+         * @param {Date} date - Date object
+         * @returns {string} Formatted date
+         */
+        function formatDate(date) {
+            if (AppState.settings.dateFormat === 'full') {
+                return date.toLocaleDateString('en-US', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                });
+            } else if (AppState.settings.dateFormat === 'short') {
+                return date.toLocaleDateString('en-US', {
+                    weekday: 'short',
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric'
+                });
+            } else {
+                return date.toLocaleDateString('en-US');
+            }
+        }
+
+        /**
+         * ======================
+         * ALARM FUNCTIONALITY
+         * ======================
+         */
+        function populateAlarmSelects() {
+            var hourSelect = document.getElementById('alarmHour');
+            var minuteSelect = document.getElementById('alarmMinute');
+
+            // Hours
+            for (var i = 1; i <= 12; i++) {
+                var option = document.createElement('option');
+                option.value = pad(i);
+                option.textContent = pad(i);
+                hourSelect.appendChild(option);
+            }
+
+            // Minutes
+            for (var j = 0; j < 60; j += 5) {
+                var opt = document.createElement('option');
+                opt.value = pad(j);
+                opt.textContent = pad(j);
+                minuteSelect.appendChild(opt);
+            }
+        }
+
+        function openAlarmModal() {
+            var modal = document.getElementById('alarmModal');
+            modal.setAttribute('aria-hidden', 'false');
+
+            // Set to current time + 1 hour
+            var now = new Date();
+            var hour = (now.getHours() + 1) % 24;
+            var minute = Math.floor(now.getMinutes() / 5) * 5;
+
+            var period = hour >= 12 ? 'PM' : 'AM';
+            var displayHour = hour % 12 || 12;
+
+            document.getElementById('alarmHour').value = pad(displayHour);
+            document.getElementById('alarmMinute').value = pad(minute);
+            document.getElementById('alarmPeriod').value = period;
+            document.getElementById('alarmLabel').value = '';
+
+            // Focus first input
+            document.getElementById('alarmHour').focus();
+        }
+
+        function closeAlarmModal() {
+            var modal = document.getElementById('alarmModal');
+            modal.setAttribute('aria-hidden', 'true');
+        }
+
+        function saveAlarm() {
+            var hour = parseInt(document.getElementById('alarmHour').value);
+            var minute = parseInt(document.getElementById('alarmMinute').value);
+            var period = document.getElementById('alarmPeriod').value;
+            var label = document.getElementById('alarmLabel').value.trim();
+
+            // Validate
+            if (isNaN(hour) || isNaN(minute)) {
+                showToast('Please select valid time', 'error');
+                return;
+            }
+
+            // Check limit
+            if (AppState.alarms.length >= CONFIG.MAX_ALARMS) {
+                showToast('Maximum ' + CONFIG.MAX_ALARMS + ' alarms reached', 'error');
+                return;
+            }
+
+            // Convert to 24-hour
+            var hour24 = hour;
+            if (period === 'PM' && hour !== 12) {
+                hour24 += 12;
+            } else if (period === 'AM' && hour === 12) {
+                hour24 = 0;
+            }
+
+            // Sanitize label
+            label = label.substring(0, CONFIG.MAX_ALARM_LABEL_LENGTH);
+            label = label || 'Alarm';
+
+            var alarm = {
+                id: Date.now(),
+                hour: hour24,
+                minute: minute,
+                label: escapeHtml(label),
+                enabled: true
+            };
+
+            AppState.alarms.push(alarm);
+            saveAlarms();
+            renderAlarms();
+            closeAlarmModal();
+
+            showToast('Alarm set for ' + pad(hour) + ':' + pad(minute) + ' ' + period, 'success');
+        }
+
+        function renderAlarms() {
+            var list = document.getElementById('alarmList');
+
+            if (AppState.alarms.length === 0) {
+                list.innerHTML = '<div style="text-align: center; padding: 40px; opacity: 0.5;">No alarms set</div>';
+                return;
+            }
+
+            list.innerHTML = AppState.alarms.map(function(alarm) {
+                var timeStr = formatAlarmTime(alarm.hour, alarm.minute);
+                return '<div class="alarm-item" role="listitem">' +
+                    '<div>' +
+                        '<div class="alarm-time">' + escapeHtml(timeStr) + '</div>' +
+                        '<div class="alarm-label">' + alarm.label + '</div>' +
+                    '</div>' +
+                    '<button class="alarm-toggle" ' +
+                        'role="switch" ' +
+                        'aria-checked="' + alarm.enabled + '" ' +
+                        'aria-label="Toggle alarm ' + (alarm.enabled ? 'off' : 'on') + '" ' +
+                        'onclick="toggleAlarm(' + alarm.id + ')">' +
+                    '</button>' +
+                    '<button class="alarm-delete" ' +
+                        'aria-label="Delete alarm" ' +
+                        'onclick="deleteAlarm(' + alarm.id + ')">×</button>' +
+                '</div>';
+            }).join('');
+        }
+
+        /**
+         * Format alarm time
+         * @param {number} hour - Hour in 24-hour format
+         * @param {number} minute - Minute
+         * @returns {string} Formatted time
+         */
+        function formatAlarmTime(hour, minute) {
+            if (AppState.settings.timeFormat === '12') {
+                var period = hour >= 12 ? 'PM' : 'AM';
+                var displayHour = hour % 12 || 12;
+                return displayHour + ':' + pad(minute) + ' ' + period;
+            } else {
+                return pad(hour) + ':' + pad(minute);
+            }
+        }
+
+        function toggleAlarm(id) {
+            var alarm = AppState.alarms.find(function(a) { return a.id === id; });
+            if (alarm) {
+                alarm.enabled = !alarm.enabled;
+                saveAlarms();
+                renderAlarms();
+                showToast('Alarm ' + (alarm.enabled ? 'enabled' : 'disabled'), 'success');
+            }
+        }
+
+        function deleteAlarm(id) {
+            AppState.alarms = AppState.alarms.filter(function(a) { return a.id !== id; });
+            saveAlarms();
+            renderAlarms();
+            showToast('Alarm deleted', 'success');
+        }
+
+        function startAlarmChecker() {
+            AppState.timers.alarm = setInterval(checkAlarms, CONFIG.CLOCK_UPDATE_INTERVAL);
+        }
+
+        function checkAlarms() {
+            var now = new Date();
+            var currentHour = now.getHours();
+            var currentMinute = now.getMinutes();
+            var currentSecond = now.getSeconds();
+
+            if (currentSecond !== 0) return;
+
+            AppState.alarms.forEach(function(alarm) {
+                if (alarm.enabled && alarm.hour === currentHour && alarm.minute === currentMinute) {
+                    triggerAlarm(alarm);
+                }
+            });
+        }
+
+        function triggerAlarm(alarm) {
+            playAlarmSound();
+
+            // Show notification
+            if ('Notification' in window && Notification.permission === 'granted') {
+                new Notification('⏰ ' + alarm.label, {
+                    body: 'Time: ' + formatAlarmTime(alarm.hour, alarm.minute),
+                    icon: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"%3E%3Ccircle fill="%23ff9500" cx="16" cy="16" r="16"/%3E%3C/svg%3E',
+                    requireInteraction: true
+                });
+            }
+
+            showToast('⏰ ALARM: ' + alarm.label, 'warning');
+        }
+
+        function playAlarmSound() {
+            try {
+                var audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+                for (var i = 0; i < 3; i++) {
+                    setTimeout(function(index) {
+                        var osc = audioContext.createOscillator();
+                        var gain = audioContext.createGain();
+
+                        osc.connect(gain);
+                        gain.connect(audioContext.destination);
+
+                        osc.frequency.value = index === 2 ? 1000 : 800;
+                        osc.type = 'sine';
+                        gain.gain.setValueAtTime(0.3, audioContext.currentTime);
+
+                        osc.start(audioContext.currentTime);
+                        osc.stop(audioContext.currentTime + (index === 2 ? 0.5 : 0.2));
+                    }, i * 300, i);
+                }
+            } catch (e) {
+                console.error('Audio playback error:', e);
+            }
+        }
+
+        function testAlarmSound() {
+            playAlarmSound();
+            showToast('Playing test sound', 'success');
+        }
+
+        /**
+         * ======================
+         * TIMER FUNCTIONALITY
+         * ======================
+         */
+        function toggleTimer() {
+            if (AppState.timer.running) {
+                pauseTimer();
+            } else {
+                startTimer();
+            }
+        }
+
+        function startTimer() {
+            if (AppState.timer.seconds === 0) {
+                var hours = parseInt(document.getElementById('timerHours').value) || 0;
+                var minutes = parseInt(document.getElementById('timerMinutes').value) || 0;
+                var seconds = parseInt(document.getElementById('timerSeconds').value) || 0;
+
+                AppState.timer.seconds = hours * 3600 + minutes * 60 + seconds;
+
+                if (AppState.timer.seconds === 0) {
+                    showToast('Please set a timer duration', 'error');
+                    return;
+                }
+            }
+
+            AppState.timer.running = true;
+            document.getElementById('timerStartBtn').textContent = 'Pause';
+
+            AppState.timers.timer = setInterval(function() {
+                AppState.timer.seconds--;
+                updateTimerDisplay();
+
+                if (AppState.timer.seconds === 0) {
+                    pauseTimer();
+                    playAlarmSound();
+                    showToast('⏰ Timer finished!', 'success');
+                }
+            }, 1000);
+        }
+
+        function pauseTimer() {
+            AppState.timer.running = false;
+            clearInterval(AppState.timers.timer);
+            document.getElementById('timerStartBtn').textContent = 'Resume';
+        }
+
+        function resetTimer() {
+            AppState.timer.running = false;
+            AppState.timer.seconds = 0;
+            clearInterval(AppState.timers.timer);
+            document.getElementById('timerStartBtn').textContent = 'Start';
+            document.getElementById('timerDisplay').textContent = '00:00:00';
+            document.getElementById('timerHours').value = 0;
+            document.getElementById('timerMinutes').value = 0;
+            document.getElementById('timerSeconds').value = 0;
+        }
+
+        function updateTimerDisplay() {
+            var hours = Math.floor(AppState.timer.seconds / 3600);
+            var minutes = Math.floor((AppState.timer.seconds % 3600) / 60);
+            var seconds = AppState.timer.seconds % 60;
+
+            document.getElementById('timerDisplay').textContent =
+                pad(hours) + ':' + pad(minutes) + ':' + pad(seconds);
+        }
+
+        /**
+         * ======================
+         * STOPWATCH FUNCTIONALITY
+         * ======================
+         */
+        function toggleStopwatch() {
+            if (AppState.stopwatch.running) {
+                pauseStopwatch();
+            } else {
+                startStopwatch();
+            }
+        }
+
+        function startStopwatch() {
+            AppState.stopwatch.running = true;
+            document.getElementById('stopwatchStartBtn').textContent = 'Pause';
+            document.getElementById('stopwatchLapBtn').classList.remove('hidden');
+
+            AppState.timers.stopwatch = setInterval(function() {
+                AppState.stopwatch.time++;
+                updateStopwatchDisplay();
+            }, CONFIG.STOPWATCH_UPDATE_INTERVAL);
+        }
+
+        function pauseStopwatch() {
+            AppState.stopwatch.running = false;
+            clearInterval(AppState.timers.stopwatch);
+            document.getElementById('stopwatchStartBtn').textContent = 'Resume';
+        }
+
+        function resetStopwatch() {
+            AppState.stopwatch.running = false;
+            AppState.stopwatch.time = 0;
+            AppState.stopwatch.laps = [];
+            clearInterval(AppState.timers.stopwatch);
+            document.getElementById('stopwatchStartBtn').textContent = 'Start';
+            document.getElementById('stopwatchLapBtn').classList.add('hidden');
+            document.getElementById('stopwatchDisplay').textContent = '00:00:00';
+            document.getElementById('stopwatchLaps').innerHTML = '';
+        }
+
+        function updateStopwatchDisplay() {
+            var totalSeconds = Math.floor(AppState.stopwatch.time / 100);
+            var hours = Math.floor(totalSeconds / 3600);
+            var minutes = Math.floor((totalSeconds % 3600) / 60);
+            var seconds = totalSeconds % 60;
+            var centiseconds = AppState.stopwatch.time % 100;
+
+            document.getElementById('stopwatchDisplay').textContent =
+                pad(hours) + ':' + pad(minutes) + ':' + pad(seconds) + '.' + pad(centiseconds);
+        }
+
+        function recordLap() {
+            if (!AppState.stopwatch.running) return;
+
+            AppState.stopwatch.laps.push(AppState.stopwatch.time);
+            renderLaps();
+            showToast('Lap ' + AppState.stopwatch.laps.length + ' recorded', 'success');
+        }
+
+        function renderLaps() {
+            var container = document.getElementById('stopwatchLaps');
+            var laps = AppState.stopwatch.laps.slice().reverse();
+
+            container.innerHTML = laps.map(function(lap, index) {
+                var totalSeconds = Math.floor(lap / 100);
+                var hours = Math.floor(totalSeconds / 3600);
+                var minutes = Math.floor((totalSeconds % 3600) / 60);
+                var seconds = totalSeconds % 60;
+                var centiseconds = lap % 100;
+
+                var timeStr = pad(hours) + ':' + pad(minutes) + ':' + pad(seconds) + '.' + pad(centiseconds);
+                var lapNum = laps.length - index;
+
+                return '<div class="alarm-item" role="listitem">' +
+                    '<div>Lap ' + lapNum + '</div>' +
+                    '<div>' + timeStr + '</div>' +
+                '</div>';
+            }).join('');
+        }
+
+        /**
+         * ======================
+         * TOGGLE SECTIONS
+         * ======================
+         */
+        function toggleSection(section) {
+            if (section === 'alarm') {
+                var alarmSection = document.getElementById('alarmSection');
+                var alarmBtn = document.getElementById('toggleAlarmBtn');
+                
+                if (alarmSection.classList.contains('hidden')) {
+                    alarmSection.classList.remove('hidden');
+                    alarmBtn.classList.add('active');
+                } else {
+                    alarmSection.classList.add('hidden');
+                    alarmBtn.classList.remove('active');
+                }
+            } else if (section === 'world') {
+                var worldSection = document.getElementById('worldClocksSection');
+                var worldBtn = document.getElementById('toggleWorldBtn');
+                
+                if (worldSection.classList.contains('hidden')) {
+                    worldSection.classList.remove('hidden');
+                    worldBtn.classList.add('active');
+                } else {
+                    worldSection.classList.add('hidden');
+                    worldBtn.classList.remove('active');
+                }
+            }
+        }
+
+        /**
+         * ======================
+         * ZOOM FUNCTIONALITY
+         * ======================
+         */
+        function zoomIn() {
+            if (AppState.zoom.level < AppState.zoom.max) {
+                AppState.zoom.level += AppState.zoom.step;
+                applyZoom();
+            }
+        }
+
+        function zoomOut() {
+            if (AppState.zoom.level > AppState.zoom.min) {
+                AppState.zoom.level -= AppState.zoom.step;
+                applyZoom();
+            }
+        }
+
+        function resetZoom() {
+            AppState.zoom.level = 1;
+            applyZoom();
+        }
+
+        function applyZoom() {
+            var baseSize = 120; // Base max size in px
+            var newSize = baseSize * AppState.zoom.level;
+            var minSize = 50 * AppState.zoom.level;
+            var vwSize = 10 * AppState.zoom.level;
+            
+            document.documentElement.style.setProperty(
+                '--time-size', 
+                'clamp(' + minSize + 'px, ' + vwSize + 'vw, ' + newSize + 'px)'
+            );
+        }
+
+        /**
+         * ======================
+         * WORLD CLOCK FUNCTIONALITY
+         * ======================
+         */
+        function renderWorldClocks() {
+            var grid = document.getElementById('worldClocksGrid');
+
+            grid.innerHTML = AppState.worldClocks.map(function(clock) {
+                var time = getWorldTime(clock.tz);
+                return '<div class="world-clock-card" role="listitem">' +
+                    '<button class="world-clock-remove" ' +
+                        'aria-label="Remove ' + escapeHtml(clock.name) + ' clock" ' +
+                        'onclick="removeWorldClock(\'' + clock.tz + '\')">×</button>' +
+                    '<div class="world-clock-city">' + escapeHtml(clock.name) + '</div>' +
+                    '<div class="world-clock-time" data-wc-tz="' + clock.tz + '">' + time.time + '</div>' +
+                    '<div class="world-clock-offset" data-wc-offset="' + clock.tz + '">' + time.date + '</div>' +
+                '</div>';
+            }).join('') +
+            '<div class="world-clock-card add-card" onclick="showAddClockModal()" role="button" aria-label="Add world clock">' +
+                '<div style="font-size: 32px; opacity: 0.6;">➕</div>' +
+            '</div>';
+        }
+
+        function updateWorldClocks() {
+            AppState.worldClocks.forEach(function(clock) {
+                var timeEl = document.querySelector('[data-wc-tz="' + clock.tz + '"]');
+                var offsetEl = document.querySelector('[data-wc-offset="' + clock.tz + '"]');
+                
+                if (timeEl && offsetEl) {
+                    var time = getWorldTime(clock.tz);
+                    timeEl.textContent = time.time;
+                    offsetEl.textContent = time.date;
+                }
+            });
+        }
+
+        /**
+         * Get formatted time for timezone
+         * @param {string} tz - Timezone string
+         * @returns {Object} Time and date strings
+         */
+        function getWorldTime(tz) {
+            try {
+                var now = new Date();
+                var timeFormatter = new Intl.DateTimeFormat('en-US', {
+                    timeZone: tz,
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: AppState.settings.timeFormat === '12'
+                });
+
+                var userTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                var userDate = new Date(now.toLocaleString('en-US', { timeZone: userTz }));
+                var targetDate = new Date(now.toLocaleString('en-US', { timeZone: tz }));
+                
+                var diffMs = targetDate.getTime() - userDate.getTime();
+                var diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+                var diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+                
+                var sign = diffHours >= 0 ? '+' : '';
+                var timeDiff = sign + diffHours + ':' + pad(Math.abs(diffMinutes));
+                
+                var dayLabel = 'Today';
+                if (targetDate.getDate() !== userDate.getDate()) {
+                    dayLabel = targetDate > userDate ? 'Tomorrow' : 'Yesterday';
+                }
+
+                return {
+                    time: timeFormatter.format(now),
+                    date: dayLabel + ', ' + timeDiff
+                };
+            } catch (e) {
+                return {
+                    time: '12:00:00',
+                    date: 'Today, +0:00'
+                };
+            }
+        }
+
+        function showAddClockModal() {
+            var cityName = prompt('Enter city name:\n\nAvailable cities:\nNew York, Chicago, Denver, Los Angeles, Phoenix, Anchorage, Honolulu,\nToronto, London, Paris, Berlin, Rome, Madrid, Moscow,\nDubai, Mumbai, Singapore, Hong Kong, Tokyo, Beijing, Seoul, Bangkok, Manila,\nSydney, Auckland, Mexico City, São Paulo, Buenos Aires, Cairo, Johannesburg');
+            
+            if (!cityName) return;
+            
+            cityName = cityName.trim();
+            
+            // Comprehensive city to timezone mapping
+            var cities = {
+                'new york': { tz: 'America/New_York', name: 'New York' },
+                'chicago': { tz: 'America/Chicago', name: 'Chicago, Illinois' },
+                'denver': { tz: 'America/Denver', name: 'Denver, Colorado' },
+                'los angeles': { tz: 'America/Los_Angeles', name: 'Los Angeles, California' },
+                'phoenix': { tz: 'America/Phoenix', name: 'Phoenix, Arizona' },
+                'anchorage': { tz: 'America/Anchorage', name: 'Anchorage, Alaska' },
+                'honolulu': { tz: 'Pacific/Honolulu', name: 'Honolulu, Hawaii' },
+                'toronto': { tz: 'America/Toronto', name: 'Toronto, Canada' },
+                'london': { tz: 'Europe/London', name: 'London, United Kingdom' },
+                'paris': { tz: 'Europe/Paris', name: 'Paris, France' },
+                'berlin': { tz: 'Europe/Berlin', name: 'Berlin, Germany' },
+                'rome': { tz: 'Europe/Rome', name: 'Rome, Italy' },
+                'madrid': { tz: 'Europe/Madrid', name: 'Madrid, Spain' },
+                'moscow': { tz: 'Europe/Moscow', name: 'Moscow, Russia' },
+                'dubai': { tz: 'Asia/Dubai', name: 'Dubai, United Arab Emirates' },
+                'mumbai': { tz: 'Asia/Kolkata', name: 'Mumbai, India' },
+                'singapore': { tz: 'Asia/Singapore', name: 'Singapore, Singapore' },
+                'hong kong': { tz: 'Asia/Hong_Kong', name: 'Hong Kong, China' },
+                'tokyo': { tz: 'Asia/Tokyo', name: 'Tokyo, Japan' },
+                'beijing': { tz: 'Asia/Shanghai', name: 'Beijing, China' },
+                'seoul': { tz: 'Asia/Seoul', name: 'Seoul, South Korea' },
+                'bangkok': { tz: 'Asia/Bangkok', name: 'Bangkok, Thailand' },
+                'manila': { tz: 'Asia/Manila', name: 'Manila, Philippines' },
+                'sydney': { tz: 'Australia/Sydney', name: 'Sydney, Australia' },
+                'auckland': { tz: 'Pacific/Auckland', name: 'Auckland, New Zealand' },
+                'mexico city': { tz: 'America/Mexico_City', name: 'Mexico City, Mexico' },
+                'são paulo': { tz: 'America/Sao_Paulo', name: 'São Paulo, Brazil' },
+                'sao paulo': { tz: 'America/Sao_Paulo', name: 'São Paulo, Brazil' },
+                'buenos aires': { tz: 'America/Argentina/Buenos_Aires', name: 'Buenos Aires, Argentina' },
+                'cairo': { tz: 'Africa/Cairo', name: 'Cairo, Egypt' },
+                'johannesburg': { tz: 'Africa/Johannesburg', name: 'Johannesburg, South Africa' }
+            };
+            
+            var cityData = cities[cityName.toLowerCase()];
+            
+            if (!cityData) {
+                showToast('City not found. Please try another.', 'error');
+                return;
+            }
+            
+            // Check if already exists
+            if (AppState.worldClocks.some(function(c) { return c.tz === cityData.tz; })) {
+                showToast('Clock already added', 'warning');
+                return;
+            }
+            
+            AppState.worldClocks.push({ tz: cityData.tz, name: cityData.name });
+            saveWorldClocks();
+            renderWorldClocks();
+            showToast('Clock added: ' + cityData.name, 'success');
+        }
+
+        function removeWorldClock(tz) {
+            AppState.worldClocks = AppState.worldClocks.filter(function(c) { return c.tz !== tz; });
+            saveWorldClocks();
+            renderWorldClocks();
+            showToast('Clock removed', 'success');
+        }
+
+        /**
+         * ======================
+         * FULLSCREEN
+         * ======================
+         */
+        function enterFullscreen() {
+            var fs = document.getElementById('fullscreenMode');
+            fs.setAttribute('aria-hidden', 'false');
+
+            var elem = document.documentElement;
+            if (elem.requestFullscreen) {
+                elem.requestFullscreen();
+            } else if (elem.webkitRequestFullscreen) {
+                elem.webkitRequestFullscreen();
+            } else if (elem.msRequestFullscreen) {
+                elem.msRequestFullscreen();
+            }
+        }
+
+        function exitFullscreen() {
+            var fs = document.getElementById('fullscreenMode');
+            fs.setAttribute('aria-hidden', 'true');
+
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            } else if (document.webkitExitFullscreen) {
+                document.webkitExitFullscreen();
+            } else if (document.msExitFullscreen) {
+                document.msExitFullscreen();
+            }
+        }
+
+        /**
+         * ======================
+         * DATA EXPORT/IMPORT
+         * ======================
+         */
+        function exportData() {
+            var data = {
+                alarms: AppState.alarms,
+                worldClocks: AppState.worldClocks,
+                settings: AppState.settings,
+                exportDate: new Date().toISOString()
+            };
+
+            var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = 'timehub-backup-' + Date.now() + '.json';
+            a.click();
+            URL.revokeObjectURL(url);
+
+            showToast('Data exported successfully', 'success');
+        }
+
+        function importData(event) {
+            var file = event.target.files[0];
+            if (!file) return;
+
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    var data = JSON.parse(e.target.result);
+
+                    if (data.alarms) AppState.alarms = data.alarms;
+                    if (data.worldClocks) AppState.worldClocks = data.worldClocks;
+                    if (data.settings) AppState.settings = data.settings;
+
+                    saveAlarms();
+                    saveWorldClocks();
+                    saveSettings();
+
+                    renderAlarms();
+                    renderWorldClocks();
+                    applyTheme();
+
+                    document.getElementById('timeFormatSelect').value = AppState.settings.timeFormat;
+                    document.getElementById('dateFormatSelect').value = AppState.settings.dateFormat;
+
+                    showToast('Data imported successfully', 'success');
+                } catch (err) {
+                    showToast('Failed to import data. Invalid file.', 'error');
+                }
+            };
+            reader.readAsText(file);
+
+            // Clear input
+            event.target.value = '';
+        }
+
+        /**
+         * ======================
+         * CLEANUP
+         * ======================
+         */
+        window.addEventListener('beforeunload', function() {
+            clearInterval(AppState.timers.clock);
+            clearInterval(AppState.timers.alarm);
+            clearInterval(AppState.timers.timer);
+            clearInterval(AppState.timers.stopwatch);
+            clearTimeout(AppState.timers.autoHide);
+        });
+
+        /**
+         * ======================
+         * GLOBAL FUNCTIONS (for inline handlers)
+         * ======================
+         */
+        window.toggleAlarm = toggleAlarm;
+        window.deleteAlarm = deleteAlarm;
+        window.removeWorldClock = removeWorldClock;
+        window.showAddClockModal = showAddClockModal;
+        window.zoomIn = zoomIn;
+        window.zoomOut = zoomOut;
+        window.resetZoom = resetZoom;
+        window.toggleSection = toggleSection;
+
+        /**
+         * ======================
+         * START APPLICATION
+         * ======================
+         */
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
